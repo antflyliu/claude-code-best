@@ -489,7 +489,16 @@ function getUserAttributes(): GrowthBookUserAttributes {
  */
 const getGrowthBookClient = memoize(
   (): { client: GrowthBook; initialized: Promise<void> } | null => {
-    if (!isGrowthBookEnabled()) {
+    // Read env-driven features BEFORE the isGrowthBookEnabled() check.
+    // This bridges CLAUDE_CODE_ENABLED_FEATURES (set in cli.tsx) to the
+    // GrowthBook SDK's ctx.global.features lookup used by feature().
+    const envFeatures = (globalThis as Record<string, unknown>).features as
+      | Record<string, unknown>
+      | undefined
+    const hasEnvFeatures = envFeatures && Object.keys(envFeatures).length > 0
+
+    // Only skip client creation if both GrowthBook and env features are absent.
+    if (!isGrowthBookEnabled() && !hasEnvFeatures) {
       return null
     }
 
@@ -527,13 +536,21 @@ const getGrowthBookClient = memoize(
       apiHost: baseUrl,
       clientKey,
       attributes,
-      remoteEval: true,
+      remoteEval: hasAuth,
       // Re-fetch when user ID or org changes (org change = login to different org)
       cacheKeyAttributes: ['id', 'organizationUUID'],
       // Add auth headers if available
       ...(authHeaders.error
         ? {}
         : { apiHostRequestHeaders: authHeaders.headers }),
+      // Merge env-driven features into GrowthBook's global context
+      ...(envFeatures && Object.keys(envFeatures).length > 0
+        ? {
+            global: {
+              features: envFeatures,
+            },
+          }
+        : {}),
       // Debug logging for Ants
       ...(process.env.USER_TYPE === 'ant'
         ? {

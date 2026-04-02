@@ -882,6 +882,7 @@ async function getInputPrompt(prompt: string, inputFormat: 'text' | 'stream-json
   return prompt;
 }
 async function run(): Promise<CommanderCommand> {
+  console.error('[debug] run() START');
   profileCheckpoint('run_function_start');
 
   // Create help config that sorts options by long option name.
@@ -1857,6 +1858,7 @@ async function run(): Promise<CommanderCommand> {
       writeToStderr(`Error: --no-session-persistence can only be used with --print mode.`);
       process.exit(1);
     }
+    console.error('[debug] PIPE MODE ENTRY');
     const effectivePrompt = prompt || '';
     let inputPrompt = await getInputPrompt(effectivePrompt, (inputFormat ?? 'text') as 'text' | 'stream-json');
     profileCheckpoint('action_after_input_prompt');
@@ -4609,7 +4611,16 @@ async function logTenguInit({
   }
 }
 function maybeActivateProactive(options: unknown): void {
-  if ((feature('PROACTIVE') || feature('KAIROS')) && ((options as {
+  // Check env-driven features directly via globalThis.features (set in cli.tsx).
+  // We bypass the feature() stub (which always returns false in dev/non-bundle builds)
+  // by reading the global directly. The bundled GrowthBook SDK's feature() function
+  // also reads from ctx.global.features which is set via the same globalThis.features.
+  const features = (globalThis as Record<string, unknown>).features as
+    | Record<string, boolean>
+    | undefined
+  const isKairosEnabled = !!(features && features['KAIROS'])
+  const isProactiveEnabled = !!(features && features['PROACTIVE'])
+  if ((isProactiveEnabled || isKairosEnabled) && ((options as {
     proactive?: boolean;
   }).proactive || isEnvTruthy(process.env.CLAUDE_CODE_PROACTIVE))) {
     // eslint-disable-next-line @typescript-eslint/no-require-imports

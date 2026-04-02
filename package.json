@@ -35,7 +35,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "bun build src/entrypoints/cli.tsx --outdir dist --target bun",
+    "build": "bun build src/entrypoints/cli.tsx --outdir dist --target bun && node -e \"const fs=require('fs'); let b=fs.readFileSync('dist/cli.js','utf8'); const lines=b.split('\\n'); const idx=lines.findIndex((l,i)=>i>2&&l.startsWith('var ')); if(idx>0){const p=fs.readFileSync('src/entrypoints/preload.ts','utf8'); lines.splice(idx,0,p.trimStart()); fs.writeFileSync('dist/cli.js',lines.join('\\n'));}\"",
     "dev": "bun run src/entrypoints/cli.tsx",
     "prepublishOnly": "bun run build",
     "lint": "biome lint src/",
